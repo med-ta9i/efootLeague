@@ -6,7 +6,8 @@ const Notifications = () => {
 
     const fetchNotifications = async () => {
         const res = await api.get('/notifications/');
-        setNotifications(res.data);
+        // Handle paginated response
+        setNotifications(res.data.results ? res.data.results : res.data);
     };
 
     useEffect(() => {
@@ -30,17 +31,23 @@ const Notifications = () => {
                 <button onClick={markAllAsRead} className="btn btn-outline">Mark all as read</button>
             </div>
             <div style={{ marginTop: '1rem', display: 'grid', gap: '1rem' }}>
-                {notifications.map(n => (
-                    <div key={n.id} className="card" style={{ opacity: n.is_read ? 0.6 : 1 }}>
-                        <p>{n.content}</p>
-                        <small>{new Date(n.created_at).toLocaleString()}</small>
-                        {!n.is_read && (
-                            <button onClick={() => markAsRead(n.id)} style={{ marginLeft: '1rem', color: 'var(--primary)' }}>
-                                Mark as read
-                            </button>
-                        )}
-                    </div>
-                ))}
+                {notifications.length === 0 ? (
+                    <p style={{ textAlign: 'center', color: 'var(--text-muted)', marginTop: '2rem' }}>
+                        vous n'avez pas de notifications
+                    </p>
+                ) : (
+                    notifications.map(n => (
+                        <div key={n.id} className="card" style={{ opacity: n.is_read ? 0.6 : 1 }}>
+                            <p>{n.content}</p>
+                            <small>{new Date(n.created_at).toLocaleString()}</small>
+                            {!n.is_read && (
+                                <button onClick={() => markAsRead(n.id)} style={{ marginLeft: '1rem', color: 'var(--primary)' }}>
+                                    Mark as read
+                                </button>
+                            )}
+                        </div>
+                    ))
+                )}
             </div>
         </div>
     );

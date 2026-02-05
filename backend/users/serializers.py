@@ -25,3 +25,11 @@ class RegisterSerializer(serializers.ModelSerializer):
             num_whatsapp=validated_data.get('num_whatsapp')
         )
         return user
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    password = serializers.CharField(write_only=True, min_length=8)
+    token = serializers.CharField()
+    uidb64 = serializers.CharField()

@@ -10,7 +10,9 @@ const TournamentList = () => {
         const fetchTournaments = async () => {
             try {
                 const res = await api.get('/tournaments/');
-                setTournaments(res.data);
+                // DRF Pagination returns { count: N, next: URL, previous: URL, results: [...] }
+                // If pagination is disabled, it returns [...]
+                setTournaments(res.data.results ? res.data.results : res.data);
             } catch (error) {
                 console.error(error);
             } finally {

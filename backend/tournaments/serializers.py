@@ -5,14 +5,53 @@ from users.serializers import UserSerializer
 class TournamentSerializer(serializers.ModelSerializer):
     admin = UserSerializer(read_only=True)
     participants_count = serializers.SerializerMethodField()
+    join_code = serializers.SerializerMethodField()
+    is_admin = serializers.SerializerMethodField()
+    is_participant = serializers.SerializerMethodField()
+    pending_request_status = serializers.SerializerMethodField()
+    join_requests = serializers.SerializerMethodField()
 
     class Meta:
         model = Tournament
-        fields = ['id', 'name', 'description', 'type', 'visibility', 'join_code', 'max_players', 'status', 'admin', 'created_at', 'participants_count']
-        read_only_fields = ['id', 'admin', 'created_at', 'join_code', 'participants_count']
+        fields = [
+            'id', 'name', 'description', 'type', 'visibility', 'join_code', 
+            'max_players', 'status', 'admin', 'created_at', 'participants_count',
+            'is_admin', 'is_participant', 'pending_request_status', 'join_requests'
+        ]
+        read_only_fields = ['id', 'admin', 'created_at', 'participants_count']
 
     def get_participants_count(self, obj):
         return obj.participants.count()
+
+    def get_join_code(self, obj):
+        request = self.context.get('request')
+        if request and request.user == obj.admin:
+            return obj.join_code
+        return None
+
+    def get_is_admin(self, obj):
+        request = self.context.get('request')
+        return request and request.user == obj.admin
+
+    def get_is_participant(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return False
+        return obj.participants.filter(user=request.user).exists()
+
+    def get_pending_request_status(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return None
+        join_req = obj.join_requests.filter(user=request.user, status='PENDING').first()
+        return join_req.status if join_req else None
+
+    def get_join_requests(self, obj):
+        request = self.context.get('request')
+        if request and request.user == obj.admin:
+            pending_requests = obj.join_requests.filter(status='PENDING')
+            return TournamentJoinRequestSerializer(pending_requests, many=True).data
+        return []
 
 class TournamentParticipantSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
@@ -43,3 +82,7 @@ class CreateTournamentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tournament
         fields = ['name', 'description', 'type', 'visibility', 'max_players']
+
+class CreateInvitationSerializer(serializers.Serializer):
+    username = serializers.CharField()
+    tournament_id = serializers.IntegerField()

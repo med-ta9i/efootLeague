@@ -10,6 +10,8 @@ import TournamentCreate from './pages/TournamentCreate';
 import Notifications from './pages/Notifications';
 import Friends from './pages/Friends';
 import Profile from './pages/Profile';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import propTypes from 'prop-types';
 
 const ProtectedRoute = ({ children }) => {
@@ -35,6 +37,8 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
 
           <Route path="/" element={<Layout />}>
             <Route index element={
