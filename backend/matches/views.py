@@ -28,9 +28,41 @@ class MatchViewSet(viewsets.ModelViewSet):
         serializer.save(created_by=self.request.user)
 
     def perform_update(self, serializer):
+        match = self.get_object()
+        if match.tournament.admin != self.request.user:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Only tournament admin can update scores.")
+
+        # Validation for negative scores
+        score1 = self.request.data.get('score_player1')
+        score2 = self.request.data.get('score_player2')
+        if (score1 is not None and int(score1) < 0) or (score2 is not None and int(score2) < 0):
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError("Scores cannot be negative.")
+
         match = serializer.save()
-        if match.status == Match.STATUS_LOCKED or match.status == Match.STATUS_PLAYED:
+        if match.status in [Match.STATUS_LOCKED, Match.STATUS_PLAYED]:
             self._update_standings(match)
+            self._check_tournament_finished(match.tournament)
+
+    def _check_tournament_finished(self, tournament):
+        # Already finished? skip
+        if tournament.status == Tournament.STATUS_FINISHED:
+            return
+
+        # Check if all matches are LOCKED
+        all_matches = Match.objects.filter(tournament=tournament)
+        if not all_matches.filter(~Q(status=Match.STATUS_LOCKED)).exists():
+            # If League, calculate winner from standings
+            if tournament.type in [Tournament.TYPE_LEAGUE, Tournament.TYPE_BOTH]:
+                from .models import LeagueStanding
+                # Get the player with highest points
+                top_standing = LeagueStanding.objects.filter(tournament=tournament).order_by('-points', '-goal_difference').first()
+                if top_standing:
+                    tournament.winner = top_standing.player
+                    tournament.status = Tournament.STATUS_FINISHED
+                    tournament.save()
+            # If Cup, it's handled in generate_next_round after the final
 
     def _update_standings(self, match):
         if match.tournament.type not in [Tournament.TYPE_LEAGUE, Tournament.TYPE_BOTH]:

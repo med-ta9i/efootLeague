@@ -3,6 +3,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
+import random
+import math
 from .models import Tournament, TournamentParticipant, TournamentJoinRequest, TournamentInvitation
 from .serializers import (
     TournamentSerializer, CreateTournamentSerializer, TournamentParticipantSerializer,
@@ -10,6 +12,7 @@ from .serializers import (
 )
 from users.models import User
 from notifications.models import Notification
+from matches.models import Match
 
 class TournamentViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
@@ -63,6 +66,181 @@ class TournamentViewSet(viewsets.ModelViewSet):
         )
         
         return Response({"message": "Join request sent"})
+
+    @action(detail=True, methods=['post'])
+    def start_tournament(self, request, pk=None):
+        tournament = self.get_object()
+        if tournament.admin != request.user:
+            return Response({"error": "Only admin can start the tournament"}, status=status.HTTP_403_FORBIDDEN)
+        
+        if tournament.status != Tournament.STATUS_DRAFT:
+            return Response({"error": "Tournament already started or finished"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        participants = list(TournamentParticipant.objects.filter(tournament=tournament))
+        if len(participants) < 2:
+            return Response({"error": "Need at least 2 players to start"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Change status
+        tournament.status = Tournament.STATUS_ONGOING
+        tournament.save()
+        
+        # Generate Fixtures - Round Robin for League
+        if tournament.type in [Tournament.TYPE_LEAGUE, Tournament.TYPE_BOTH]:
+            players = [p.user for p in participants]
+            if len(players) % 2 != 0:
+                players.append(None) # Bye player
+            
+            num_players = len(players)
+            num_rounds = num_players - 1
+            matches_per_round = num_players // 2
+            
+            created_count = 0
+            for r in range(num_rounds):
+                round_label = f"Round {r + 1}"
+                for i in range(matches_per_round):
+                    p1 = players[i]
+                    p2 = players[num_players - 1 - i]
+                    
+                    if p1 and p2:
+                        Match.objects.get_or_create(
+                            tournament=tournament,
+                            player1=p1,
+                            player2=p2,
+                            round=round_label,
+                            defaults={'created_by': request.user}
+                        )
+                        created_count += 1
+                
+                # Rotate players (keep first player fixed)
+                players = [players[0]] + [players[-1]] + players[1:-1]
+            
+            return Response({"message": f"Tournament started! {created_count} matches generated across {num_rounds} rounds."})
+            
+        elif tournament.type == Tournament.TYPE_CUP:
+            num_players = len(participants)
+            
+            # Check if power of 2
+            if not (num_players > 0 and (num_players & (num_players - 1)) == 0):
+                # Revert status if validation fails
+                tournament.status = Tournament.STATUS_DRAFT
+                tournament.save()
+                return Response({
+                    "error": f"Le nombre de joueurs ({num_players}) doit être une puissance de 2 (2, 4, 8, 16...) pour un mode Coupe."
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Determine Round Name
+            round_name = Match.ROUND_FINAL
+            if num_players == 4: round_name = Match.ROUND_SF
+            elif num_players == 8: round_name = Match.ROUND_QF
+            elif num_players == 16: round_name = Match.ROUND_R16
+            
+            # Shuffle and Generate Pairs
+            players = [p.user for p in participants]
+            random.shuffle(players)
+            
+            created_count = 0
+            for i in range(0, num_players, 2):
+                Match.objects.create(
+                    tournament=tournament,
+                    player1=players[i],
+                    player2=players[i+1],
+                    round=round_name,
+                    created_by=request.user
+                )
+                created_count += 1
+            
+            return Response({"message": f"Tournoi lancé ! {created_count} matches de {round_name} générés."})
+
+        return Response({"message": "Tournament started!"})
+
+    @action(detail=True, methods=['post'])
+    def generate_next_round(self, request, pk=None):
+        tournament = self.get_object()
+        if tournament.admin != request.user:
+            return Response({"error": "Only admin can generate next round"}, status=status.HTTP_403_FORBIDDEN)
+        
+        if tournament.type not in [Tournament.TYPE_CUP, Tournament.TYPE_BOTH]:
+            return Response({"error": "Only Cup tournaments have rounds progression"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 1. Identify current round
+        all_matches = Match.objects.filter(tournament=tournament)
+        if not all_matches.exists():
+            return Response({"error": "No matches found. Start the tournament first."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Determine the latest round played
+        round_order = [Match.ROUND_R16, Match.ROUND_QF, Match.ROUND_SF, Match.ROUND_FINAL]
+        latest_matches = None
+        current_round = None
+        
+        for r in reversed(round_order):
+            matches_in_round = all_matches.filter(round=r)
+            if matches_in_round.exists():
+                latest_matches = matches_in_round
+                current_round = r
+                break
+        
+        if not current_round:
+            return Response({"error": "Could not identify current round"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if current_round == Match.ROUND_FINAL:
+             # Check if final is finished to mark tournament as finished?
+             final_match = latest_matches.first()
+             if final_match.status == Match.STATUS_LOCKED:
+                 # Determine winner
+                 if final_match.score_player1 > final_match.score_player2:
+                     tournament.winner = final_match.player1
+                 elif final_match.score_player2 > final_match.score_player1:
+                     tournament.winner = final_match.player2
+                 
+                 tournament.status = Tournament.STATUS_FINISHED
+                 tournament.save()
+                 return Response({"message": f"Tournament finished! Champion: {tournament.winner.username}"})
+             return Response({"error": "Final match is not locked yet"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 2. Check if all matches in latest round are LOCKED and have winners
+        if latest_matches.filter(~Q(status=Match.STATUS_LOCKED)).exists():
+            return Response({"error": f"All matches in {current_round} must be LOCKED before generating next round."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        winners = []
+        for m in latest_matches:
+            if not m.winner:
+                # Fallback: determine winner from score
+                if m.score_player1 > m.score_player2:
+                    winners.append(m.player1)
+                elif m.score_player2 > m.score_player1:
+                    winners.append(m.player2)
+                else:
+                    return Response({"error": f"Match {m.id} is a draw. Cup matches must have a winner."}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                winners.append(m.winner)
+
+        # 3. Pair winners for next round
+        num_winners = len(winners)
+        if num_winners < 2:
+             return Response({"error": "Not enough winners to generate next round"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        next_round = None
+        if num_winners == 8: next_round = Match.ROUND_QF
+        elif num_winners == 4: next_round = Match.ROUND_SF
+        elif num_winners == 2: next_round = Match.ROUND_FINAL
+        else:
+             # Handle odd numbers if any, but power of 2 should prevent this
+             return Response({"error": f"Unexpected number of winners: {num_winners}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Shuffle winners for next pairings
+        random.shuffle(winners)
+        created_count = 0
+        for i in range(0, num_winners, 2):
+            Match.objects.create(
+                tournament=tournament,
+                player1=winners[i],
+                player2=winners[i+1],
+                round=next_round,
+                created_by=request.user
+            )
+            created_count += 1
+            
+        return Response({"message": f"Round {next_round} generated with {created_count} matches."})
 
     @action(detail=True, methods=['get'])
     def participants(self, request, pk=None):

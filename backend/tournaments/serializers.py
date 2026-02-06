@@ -4,6 +4,7 @@ from users.serializers import UserSerializer
 
 class TournamentSerializer(serializers.ModelSerializer):
     admin = UserSerializer(read_only=True)
+    winner = UserSerializer(read_only=True)
     participants_count = serializers.SerializerMethodField()
     join_code = serializers.SerializerMethodField()
     is_admin = serializers.SerializerMethodField()
@@ -15,10 +16,10 @@ class TournamentSerializer(serializers.ModelSerializer):
         model = Tournament
         fields = [
             'id', 'name', 'description', 'type', 'visibility', 'join_code', 
-            'max_players', 'status', 'admin', 'created_at', 'participants_count',
+            'max_players', 'status', 'admin', 'winner', 'created_at', 'participants_count',
             'is_admin', 'is_participant', 'pending_request_status', 'join_requests'
         ]
-        read_only_fields = ['id', 'admin', 'created_at', 'participants_count']
+        read_only_fields = ['id', 'admin', 'winner', 'created_at', 'participants_count']
 
     def get_participants_count(self, obj):
         return obj.participants.count()

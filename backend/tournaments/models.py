@@ -39,6 +39,7 @@ class Tournament(models.Model):
     max_players = models.IntegerField(default=16)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_DRAFT)
     admin = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='administered_tournaments')
+    winner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='tournaments_won')
     created_at = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
