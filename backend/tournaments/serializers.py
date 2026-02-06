@@ -59,7 +59,7 @@ class TournamentParticipantSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = TournamentParticipant
-        fields = ['id', 'user', 'role', 'joined_at']
+        fields = ['id', 'user', 'role', 'group', 'joined_at']
 
 class TournamentJoinRequestSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)

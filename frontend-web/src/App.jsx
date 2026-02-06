@@ -12,6 +12,8 @@ import Friends from './pages/Friends';
 import Profile from './pages/Profile';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import PlayersList from './pages/PlayersList';
+import UserProfile from './pages/UserProfile';
 import propTypes from 'prop-types';
 
 const ProtectedRoute = ({ children }) => {
@@ -52,6 +54,8 @@ function App() {
             <Route path="notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
             <Route path="friends" element={<ProtectedRoute><Friends /></ProtectedRoute>} />
             <Route path="profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+            <Route path="players" element={<ProtectedRoute><PlayersList /></ProtectedRoute>} />
+            <Route path="users/:id" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
             <Route path="*" element={<div>404 Not Found</div>} />
           </Route>
         </Routes>

@@ -263,7 +263,42 @@ const TournamentDetail = () => {
                 )}
             </header>
 
-            {tournament.type !== 'CUP' && (
+            {tournament.type === 'BOTH' ? (
+                <section style={{ marginBottom: '2rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+                        {['A', 'B'].map(grp => (
+                            <div key={grp}>
+                                <h2>Groupe {grp}</h2>
+                                <div className="card" style={{ overflowX: 'auto' }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                        <thead>
+                                            <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border)' }}>
+                                                <th style={{ padding: '0.5rem' }}>Player</th>
+                                                <th style={{ padding: '0.5rem' }}>Pts</th>
+                                                <th style={{ padding: '0.5rem' }}>GD</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {standings
+                                                .filter(s => {
+                                                    const p = participants.find(part => part.user.id === s.player.id);
+                                                    return p?.group === grp;
+                                                })
+                                                .map(s => (
+                                                    <tr key={s.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                                        <td style={{ padding: '0.5rem' }}>{s.player.username}</td>
+                                                        <td style={{ padding: '0.5rem', fontWeight: 'bold' }}>{s.points}</td>
+                                                        <td style={{ padding: '0.5rem' }}>{s.goal_difference}</td>
+                                                    </tr>
+                                                ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+            ) : tournament.type === 'LEAGUE' && (
                 <section style={{ marginBottom: '2rem' }}>
                     <h2>Standings</h2>
                     <div className="card" style={{ overflowX: 'auto' }}>

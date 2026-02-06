@@ -62,6 +62,7 @@ class TournamentParticipant(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     tournament = models.ForeignKey(Tournament, on_delete=models.CASCADE, related_name='participants')
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default=ROLE_PLAYER)
+    group = models.CharField(max_length=1, blank=True, null=True) # 'A' or 'B'
     joined_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

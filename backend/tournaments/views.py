@@ -116,6 +116,58 @@ class TournamentViewSet(viewsets.ModelViewSet):
             
             return Response({"message": f"Tournament started! {created_count} matches generated across {num_rounds} rounds."})
             
+        elif tournament.type == Tournament.TYPE_BOTH:
+            num_players = len(participants)
+            if num_players < 4:
+                tournament.status = Tournament.STATUS_DRAFT
+                tournament.save()
+                return Response({"error": "Le mode Mixte (Liga + Cup) nécessite au moins 4 joueurs."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # 1. Randomly Split into Group A and Group B (as balanced as possible)
+            random.shuffle(participants)
+            mid = num_players // 2
+            group_a_parts = participants[:mid]
+            group_b_parts = participants[mid:]
+            
+            for p in group_a_parts:
+                p.group = 'A'
+                p.save()
+            for p in group_b_parts:
+                p.group = 'B'
+                p.save()
+            
+            # 2. Generate fixtures for each group
+            created_count = 0
+            for group_label, group_participants in [('A', group_a_parts), ('B', group_b_parts)]:
+                players = [p.user for p in group_participants]
+                if len(players) % 2 != 0:
+                    players.append(None) # Bye player
+                
+                num_p = len(players)
+                num_r = num_p - 1
+                m_per_r = num_p // 2
+                
+                for r in range(num_r):
+                    round_label = f"Group {group_label} - Round {r + 1}"
+                    for i in range(m_per_r):
+                        p1 = players[i]
+                        p2 = players[num_p - 1 - i]
+                        
+                        if p1 and p2:
+                            Match.objects.get_or_create(
+                                tournament=tournament,
+                                player1=p1,
+                                player2=p2,
+                                round=round_label,
+                                defaults={'created_by': request.user}
+                            )
+                            created_count += 1
+                    
+                    # Rotate players (keep first fixed)
+                    players = [players[0]] + [players[-1]] + players[1:-1]
+            
+            return Response({"message": f"Tournoi lancé ! {num_players} joueurs divisés en 2 groupes ({len(group_a_parts)} vs {len(group_b_parts)}). {created_count} matches générés."})
+
         elif tournament.type == Tournament.TYPE_CUP:
             num_players = len(participants)
             
@@ -179,6 +231,41 @@ class TournamentViewSet(viewsets.ModelViewSet):
                 current_round = r
                 break
         
+        # SPECIAL CASE: TYPE_BOTH Group Stage to SF
+        if tournament.type == Tournament.TYPE_BOTH and not current_round:
+             # Check if any Group matches exist
+             group_matches = all_matches.filter(round__icontains='Group')
+             if group_matches.exists():
+                 # Check if all group matches are LOCKED
+                 if group_matches.filter(~Q(status=Match.STATUS_LOCKED)).exists():
+                     return Response({"error": "Tous les matches de poules doivent être terminés (LOCKED) avant les demi-finales."}, status=status.HTTP_400_BAD_REQUEST)
+                 
+                 # Calculate winners from Group A and B
+                 from matches.models import LeagueStanding
+                 standings_a = LeagueStanding.objects.filter(tournament=tournament, player__tournamentparticipant__group='A').order_by('-points', '-goal_difference')[:2]
+                 standings_b = LeagueStanding.objects.filter(tournament=tournament, player__tournamentparticipant__group='B').order_by('-points', '-goal_difference')[:2]
+                 
+                 if len(standings_a) < 2 or len(standings_b) < 2:
+                      return Response({"error": "Pas assez de joueurs dans les groupes pour les demis."}, status=status.HTTP_400_BAD_REQUEST)
+                 
+                 # 1A vs 2B
+                 Match.objects.create(
+                     tournament=tournament,
+                     player1=standings_a[0].player,
+                     player2=standings_b[1].player,
+                     round=Match.ROUND_SF,
+                     created_by=request.user
+                 )
+                 # 1B vs 2A
+                 Match.objects.create(
+                     tournament=tournament,
+                     player1=standings_b[0].player,
+                     player2=standings_a[1].player,
+                     round=Match.ROUND_SF,
+                     created_by=request.user
+                 )
+                 return Response({"message": "Demi-finales générées (1A vs 2B, 1B vs 2A) !"})
+
         if not current_round:
             return Response({"error": "Could not identify current round"}, status=status.HTTP_400_BAD_REQUEST)
 

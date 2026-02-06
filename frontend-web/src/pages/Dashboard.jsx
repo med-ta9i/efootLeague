@@ -7,7 +7,12 @@ const Dashboard = () => {
     return (
         <div className="container">
             <h1>Welcome, {user?.username}!</h1>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem', marginTop: '2rem' }}>
+            <div style={{ marginBottom: '2rem' }}>
+                <Link to="/players" className="btn btn-primary" style={{ padding: '0.8rem 1.5rem', fontSize: '1.1rem', background: '#6f42c1' }}>
+                    🔍 Explorer les joueurs
+                </Link>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem', marginTop: '1rem' }}>
                 <div className="card">
                     <h3>My Tournaments</h3>
                     <p>Manage or view tournaments you are participating in.</p>

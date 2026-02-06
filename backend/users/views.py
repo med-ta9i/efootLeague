@@ -29,6 +29,15 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
     def get_object(self):
         return self.request.user
 
+class UserListView(generics.ListAPIView):
+    queryset = User.objects.all().order_by('username')
+    permission_classes = (permissions.IsAuthenticated,)
+    serializer_class = UserSerializer
+
+    def get_queryset(self):
+        # Optionally exclude the current user
+        return User.objects.exclude(id=self.request.user.id).order_by('username')
+
 class PasswordResetRequestView(APIView):
     permission_classes = (permissions.AllowAny,)
 
