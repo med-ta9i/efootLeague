@@ -377,7 +377,10 @@ const TournamentDetail = () => {
                                                         type="number"
                                                         min="0"
                                                         value={editScores.s1}
-                                                        onChange={e => setEditScores({ ...editScores, s1: Math.max(0, parseInt(e.target.value) || 0) })}
+                                                        onChange={e => {
+                                                            const val = parseInt(e.target.value);
+                                                            setEditScores({ ...editScores, s1: isNaN(val) || val < 0 ? 0 : val });
+                                                        }}
                                                         style={{ width: '50px', textAlign: 'center' }}
                                                     />
                                                     <span>-</span>
@@ -385,7 +388,10 @@ const TournamentDetail = () => {
                                                         type="number"
                                                         min="0"
                                                         value={editScores.s2}
-                                                        onChange={e => setEditScores({ ...editScores, s2: Math.max(0, parseInt(e.target.value) || 0) })}
+                                                        onChange={e => {
+                                                            const val = parseInt(e.target.value);
+                                                            setEditScores({ ...editScores, s2: isNaN(val) || val < 0 ? 0 : val });
+                                                        }}
                                                         style={{ width: '50px', textAlign: 'center' }}
                                                     />
                                                 </div>

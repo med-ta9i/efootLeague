@@ -54,7 +54,7 @@ class PasswordResetRequestView(APIView):
                 # frontend_url = f"{settings.FRONTEND_URL}/reset-password?uid={uid}&token={token}"
                 
                 # Using dummy link for now, assuming frontend at localhost:3000
-                reset_link = f"http://localhost:3001/reset-password?uid={uid}&token={token}"
+                reset_link = f"http://localhost:3000/reset-password?uid={uid}&token={token}"
                 
                 print(f"Password Reset Link: {reset_link}") # For Dev
                 

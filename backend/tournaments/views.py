@@ -51,21 +51,17 @@ class TournamentViewSet(viewsets.ModelViewSet):
             if code != tournament.join_code:
                 return Response({"error": "Invalid join code"}, status=status.HTTP_400_BAD_REQUEST)
             
-            # Join immediately if code matches
-            TournamentParticipant.objects.create(user=request.user, tournament=tournament, role=TournamentParticipant.ROLE_PLAYER)
-            return Response({"message": "Joined tournament successfully"})
-        
-        # Public tournament creates a request
-        TournamentJoinRequest.objects.create(user=request.user, tournament=tournament)
+        # Join immediately (Public OR Private with correct code)
+        TournamentParticipant.objects.create(user=request.user, tournament=tournament, role=TournamentParticipant.ROLE_PLAYER)
         
         # Notify Admin
         Notification.objects.create(
             receiver=tournament.admin,
-            type=Notification.TYPE_TOURNAMENT_REQUEST,
-            content=f"{request.user.username} requested to join your tournament: {tournament.name}"
+            type=Notification.TYPE_TOURNAMENT_REQUEST, # Reusing this type for "Join Event"
+            content=f"{request.user.username} has joined your tournament: {tournament.name}"
         )
         
-        return Response({"message": "Join request sent"})
+        return Response({"message": "Joined tournament successfully"})
 
     @action(detail=True, methods=['post'])
     def start_tournament(self, request, pk=None):

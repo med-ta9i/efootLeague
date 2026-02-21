@@ -82,7 +82,8 @@ class TournamentInvitationSerializer(serializers.ModelSerializer):
 class CreateTournamentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tournament
-        fields = ['name', 'description', 'type', 'visibility', 'max_players']
+        fields = ['id', 'name', 'description', 'type', 'visibility', 'max_players']
+        read_only_fields = ['id']
 
 class CreateInvitationSerializer(serializers.Serializer):
     username = serializers.CharField()

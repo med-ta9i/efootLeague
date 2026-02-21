@@ -80,6 +80,7 @@ const TournamentCreate = () => {
                     <input
                         type="number"
                         name="max_players"
+                        min="2"
                         value={formData.max_players}
                         onChange={handleChange}
                         style={{ width: '100%', padding: '0.5rem', marginTop: '0.5rem' }}

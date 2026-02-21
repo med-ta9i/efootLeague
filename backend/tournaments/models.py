@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.core.validators import MinValueValidator
 import uuid
 
 class Tournament(models.Model):
@@ -36,7 +37,7 @@ class Tournament(models.Model):
     type = models.CharField(max_length=10, choices=TYPE_CHOICES, default=TYPE_LEAGUE)
     visibility = models.CharField(max_length=10, choices=VISIBILITY_CHOICES, default=VISIBILITY_PUBLIC)
     join_code = models.CharField(max_length=20, blank=True, null=True, unique=True)
-    max_players = models.IntegerField(default=16)
+    max_players = models.PositiveIntegerField(default=16, validators=[MinValueValidator(2)])
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_DRAFT)
     admin = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='administered_tournaments')
     winner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='tournaments_won')
